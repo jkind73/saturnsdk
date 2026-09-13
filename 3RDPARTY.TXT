@@ -1,0 +1,26 @@
+Caution for 3rd party developers using a development system that 
+requires a Saturn system disc.
+
+The following notice needs to be followed in the case of a production 
+unit Saturn being used for development.  The black 3rd party system 
+disc is different from the Sega brand developer system disc, hence 
+the IP.BIN file must be modified before using VCDBUILD.EXE  The change 
+is as follows:
+
+
+Line 10H reads:
+"SEGA ENTERPRISES" (16 charaters)
+
+The correct 3rd party format is:
+"SEGA TP T-000   " (16 characters)
+where 000 represents the company ID number.  
+                 (available from Sega's 3rd party dept.)
+
+The correct IP.BIN is located in the 3RDPARTY> directory.
+Failure to follow will result in an "unsuitable disc" error from the Saturn.
+
+
+Developers can find this information in the "Disk Format Standards 
+Manual (ST-043-R3-011895)" or the "Boot ROM System User's Manual 
+(ST-220-120994)".  Also, be aware that there is an older version of 
+the manual ST-040-R2-062294.

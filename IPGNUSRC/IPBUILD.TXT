@@ -1,0 +1,46 @@
+IPBUILD.TXT			
+11/96
+
+The following files in the IPGNUSRC directory are for creating an IP.BIN.  It is based on 
+source code that's on the DTS CD, but is documented better.  Also included are 
+some general and background material to assist in using keydisks and IP's.
+
+When you create an IP.BIN for your product you should create it by compiling it 
+for your product. You should NEVER patch or otherwise re-use an IP from elsewhere. 
+A Sega solution to create this IP is contained in the IPGNUSRC directory. The 
+solution is very well documented, and as long as you follow the instructions 
+carefully, you should have little problem creating your IP.BIN.
+
+Directions for use:
+
+1)	In the directory \IPGNUSRC\SYS, read the file sys_id.src. This is
+	a documented code file. Normally you can customise your IP.BIN entirely
+	by making changes to this file alone.
+
+2)	IP.BIN is compiled through GNU V2.6+. To compile type the command line
+	'make' from within the IPGNUSRC\SYS directory after ensuring that the 
+	GNU compiler is correctly setup.
+
+
+There is no one-to-one relationship with specific IP's and specific key discs. 
+Instead, an IP is either Third party or Sega brand. If the key disc is black the 
+IP needs to be built for third party. If it is red then the IP needs to be built 
+for Sega brand. If for example, you are creating a third party IP, then ANY black 
+key disc will be suitable for booting this IP IF the following condition is met :
+
+Each Saturn in a Sega territory is stamped with a specific country code. For Japan 
+this is "J". For Europe this is "E". For the USA a "U". An IP in a product also 
+contains one or more country codes which MUST match the country code of the machine 
+on which the game is to be run.
+
+You DO encode your third party code as on your key disc into your IP.BIN, however, 
+this is NOT essential for the booting process, but needs to be included for later 
+evaluation at the submission stage.
+
+When a saturn disk is booted, IP.BIN is first loaded and executed, and then control 
+is passed to your program via an address jump built into IP.BIN. It is imperative 
+that your programs load and run address are consistant with the address which IP.BIN 
+expects to see your program reside at. I would strongly advise you to ensure that 
+your program's load / run address are the same AND are above 0x6004000 (the Sega 
+default is 0x6010000).
+

@@ -1,0 +1,43 @@
+#ifndef  _monitor_h
+#define  _monitor_h
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+// These are the functions that match the monitor functions...
+extern  EC      MON_ByteRead(DWORD, int, BYTE *);
+extern  EC      MON_ByteWrite(DWORD, int, BYTE *);
+extern  EC      MON_GetVersionString(char *);
+extern  EC      MON_Go(GameuPT);
+extern  EC      MON_Initialize(void);
+extern  EC      MON_LongRead(DWORD, int, BYTE *);
+extern  EC      MON_LongWrite(DWORD, int, BYTE *);
+extern  EC      MON_MakeSafe(GameuPT);
+extern  EC      MON_ReadRegisters(GameuPT, void *);
+extern  EC      MON_ReadUBC(GameuPT, UBCT *);
+extern  void    MON_ShutDown(void);
+extern  EC      MON_Stop(GameuPT);
+extern  EC      MON_WordRead(DWORD, int, BYTE *);
+extern  EC      MON_WordWrite(DWORD, int, BYTE *);
+extern  EC      MON_WriteRegisters(GameuPT, void *);
+extern  EC      MON_WriteUBC(GameuPT, UBCT *);
+
+// And the internal functions ...
+extern  EC      IssueMonitorCommand(WORD, GameuPT, DWORD, DWORD, DWORD);
+extern  EC      GameErrorMap(WORD);
+extern  void    MON_MessagesON(void);
+extern  void    MON_MessagesOFF(void);
+
+extern	DWORD  _fastcall Swap32(DWORD);
+extern  WORD   _fastcall Swap16(WORD);
+
+extern  CartDevBuffIdT   MON_DPRInbuff;
+extern  CartDevBuffIdT   MON_DPROutbuff;
+
+#ifdef __cplusplus
+}
+#endif
+
+#define MON_MEMPOOLSIZE     (32 * 1024)
+
+#endif

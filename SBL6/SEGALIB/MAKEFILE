@@ -1,0 +1,76 @@
+#
+#■この makefile の利用手引き
+# 1. ディレクトリの設定を調整してください。
+#    マクロ GCC, SEGALIB, SEGASMP を定義してください。
+# 2. コンフィギュレーションファイル sample.cfg を作成してください。
+#    マクロ TARGET と OBJS を定義してください。
+# 3. マクロ PROJ を指定して make を実行してください。
+#
+
+#
+#■このファイルで使われているマクロの説明
+#  （コマンドラインで定義します）
+#  PROJ         サンプルのあるディレクトリを指定してください。
+#  NDEBUG       リリースバージョンのオブジェクトを作りたいときに定義します。
+#  
+#  （このファイル makefile の中で定義してあります）
+#  CC           Ｃコンパイラを指定します。（実行可能な形で記述してください）
+#  CFLAGS       Ｃコンパイラのオプションを指定します。
+#               （注：SPR は、最適化すると動きません。原因は調査中です。）
+#  AS           アセンブラを指定します。（実行可能な形で記述してください）
+#  ASFLAGS      アセンブラのオプションを指定します。
+#  AR           ライブラリアンを指定します。（実行可能な形で記述してください）
+#  ARFLAGS      ライブラリアンのオプションを指定します。
+#  GCC          ＧＮＵのあるディレクトリを指定します。
+#  SEGASMP      ＳＢＬのサンプルのあるディレクトリを指定します。
+#  SEGALIB      ＳＢＬのライブラリのあるディレクトリを指定します。
+#  LOCATE_FILE  メモリのロケーションを記述したファイルです。
+#  ENTRY_POINT  サンプルプログラムの実行開始アドレスを指定します。
+#  LIBS         リンクするライブラリを指定します。
+#  INCDIR       ヘッダファイルのあるディレクトリを指定します。
+#  LIBDIR       ライブラリファイルを置くディレクトリを指定します。
+#  OBJDIR       オブジェクトファイルを置くディレクトリを指定します。
+#  SRCDIR       ソースファイルのあるディレクトリを指定します。
+#  
+#  （コンフィギュレーションファイル sample.cfg の中で定義します）
+#  TARGET       サンプルプログラムの名前を指定します。
+#               （ファイルのプライマリネームになります）
+#  OBJS         リンクするオブジェクトファイルを指定します。
+#
+
+CC = gcc
+AS = gasm
+AR = ar
+
+GCC     = ../gccsh
+
+LIBDIR  = lib
+INCDIR  = include
+OBJDIR  = $(PROJ)
+SRCDIR  = $(PROJ)
+CFLAGS  = -Wall -m2 -D_SH -DMODEL_S -I$(GCC)/include -I$(INCDIR)
+ASFLAGS =
+ARFLAGS = rv
+RMFLAGS = -f
+TARGET2 = $(LIBDIR)/sega_sat.a
+
+include	$(SRCDIR)/objects
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(AR) $(ARFLAGS) $@ $?
+	$(AR) $(ARFLAGS) $(TARGET2) $?
+
+.SUFFIXES:
+.SUFFIXES: .a .o .src .c
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+	$(CC) -c $(CFLAGS) $(_CFLAGS) -o $@ $<
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.src
+	$(AS) $< $(ASFLAGS) $(_ASFLAGS) -o $@
+
+clean:
+	del $(PROJ)\*.o
+

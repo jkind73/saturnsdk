@@ -1,0 +1,11 @@
+sh-elf-gcc ../common/cinit.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o ../common/cinit.o
+sh-elf-gcc main.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o main.o
+sh-elf-gcc aki_ashi.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o aki_ashi.o
+sh-elf-gcc aki_dou.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o aki_dou.o
+sh-elf-gcc aki_kao.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o aki_kao.o
+sh-elf-gcc aki_kata.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o aki_kata.o
+sh-elf-gcc aki_ude.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o aki_ude.o
+sh-elf-gcc aki_walk.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o aki_walk.o
+sh-elf-gcc workarea.c  -O2 -m2 -g -c -I/home/excyber/local/sh-elf/sgl/inc -o workarea.o
+sh-elf-gcc -m2 -L/home/excyber/local/sh-elf/sgl/lib -Xlinker --format=coff-sh -Xlinker -T../common/sl.lnk -Xlinker -Map -Xlinker sl.map -Xlinker -e -Xlinker ___Start -nostartfiles  ../common/cinit.o main.o aki_ashi.o aki_dou.o aki_kao.o aki_kata.o aki_ude.o aki_walk.o workarea.o -lsgl -o sl.coff
+sh-elf-objcopy -O binary sl.coff sl.bin

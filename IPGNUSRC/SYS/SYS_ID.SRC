@@ -1,0 +1,416 @@
+;=======================================================================
+;       sys_id.src -- System ID for 3rd Party           (Ver.1994-11-11)
+;
+;       Documentation for this file localised           (Ver.1996-03-15)
+;       (for English) and expanded
+;=======================================================================
+
+;
+; Please refer to the Saturn Boot ROM System Users Manual Ver 1.0 ST-220
+;
+;
+; Additional Tips / Notes :
+;       
+;       (1)     Perform your IP.BIN compiles within the SYS directory.
+;
+;       (2)     When IP.BIN has been compiled and created, dump IP.BIN 
+;               using your favourite hex editor (debug, td or whatever), 
+;               and double check the header section of this file to make 
+;               certain that the compile has produced correct output. A 
+;               good point to check first is at start offset 60H which 
+;               should be the start of your game title string.
+;
+;       (3)     If you are using a load / run address other than the
+;               default 6010000H, then please read the notes relating to
+;               the '1st Read Address' section in this file.
+;
+;	(4)	When the area code selection has been made (see the section
+;		Area Symbol(s) at start offset 40H, then the makefile must 
+;		also be modified, to correctly link in the appropriate area 
+;		driver code you are creating your product for. See the 
+;		makefile for details.
+;
+
+;
+; Do not change the following line
+;
+	.SECTION SYSID,CODE,ALIGN=4
+
+;
+; Hardware Identifiers          (Start offset 00H)
+;
+;       Definition              Specific ID for hardware
+;       Usable chars            Uppercase alpha chars only
+;       Number of chars         16
+;       Entry rules             String fixed as "SEGA SEGASATURN "
+;                               This string should never be changed.
+;
+	.SDATA  "SEGA SEGASATURN "
+
+;
+; Manufacturer ID               (Start offset 10H)
+;
+;       Definition              Enter manufacturer ID specified by SEGA
+;       Usable chars            Alphanumeric chars only
+;       Number of chars         16
+;       Entry rules             Sega brand
+;
+;                                       Fixed at 16 chars "SEGA ENTERPRISES"
+;
+;                               Third party
+;
+;                                       16 chars "SEGA TP KAISHA-A"
+;
+;                                       Specific company code assigned to each 
+;                                       3rd party company is entered for
+;                                       KAISHA-A"
+;
+;       Notes / Examples        For example if a specific company code is T-001,
+;                               then you would create the following line :
+;
+;                               "SEGA TP T-","0","0","1   "
+;
+;                               The chars T-","0","0","1   " must be left 
+;                               justified and padded with spaces to make a full 
+;                               16 characters.
+;
+;                               This manufacturer ID will almost always be in
+;                               the form T-<digit><digit><digit>, but if for 
+;                               any reason it is different, and/or the code you 
+;                               need to use has leading zeroes, then make sure 
+;                               that the leading zeroes are encapsulated 
+;                               within double quotes as in the example above.
+;                               If you do not, then the compilation will 
+;                               supress them and cause subsequent missalignment
+;                               of following field entries in the compiled 
+;                               output. 
+;
+;                               Double checking against this potential
+;                               problem is the reason for the existance of
+;                               Tips / Notes item (2).
+;
+
+;       .SDATA  "SEGA TP T-","0","0","1   "
+	.SDATA  "SEGA TP KAISHA-A"
+
+;
+; Put your product code - as supplied by Sega Third Party - here.
+;
+; Product Numbers               (Start offset 20H)
+;
+;       Definition              Enter the product code specified by SEGA
+;       Usable chars            Alphanumeric chars only
+;       Number of chars         10
+;       Entry rules             Pad fill with spaces on the right end
+;
+;       Notes / Examples        Note the point made concerning leading zeroes
+;                               in the Notes / Examples text for the 
+;                               Manufacturer ID section.
+;
+;                               An example of a correctly formatted entry
+;                               assuming a third party product number of
+;                               "T-00101H  " is given below.
+;                               
+
+;       .SDATA  "T-","0","0","1","0","1H  "
+	.SDATA  "999999999 "
+
+;
+; Version                       (Start offset 2AH)
+;
+;       Definition              Enter the version of the game you are creating
+;       Usable chars            Uppercase "V", numbers and full stop "."
+;       Number of chars         6
+;       Entry rules             Must begin with a "V", followed by
+;                                       One digit    - The major ver number
+;                                       A full stop
+;                                       Three digits - The minor ver number
+;
+;       Notes / Examples        Version string V0.801 encoded as
+;                                       "V0.","8","0","1"
+;                               Version string V1.250 encoded as
+;                                       "V1.","2","5","0"
+;
+
+;       .SDATA  "V1.","2","5","0"
+	.SDATA  "V1.","0","0","0"
+
+;
+; Release Date                  (Start offset 30H)
+;
+;       Definition              Enter the master disk creation date
+;       Usable chars            Numbers only
+;       Number of chars         8
+;       Entry rules             Year must be 4 digits and month and day
+;                               must be two digits each.
+;
+;       Notes / Examples        Date format is "YYYYMMDD", so date of
+;                               September the 12th 1994 encoded as
+;
+;                               "19940912"
+;
+
+	.SDATA  "19941122"
+
+;
+; Device Information            (Start offset 38H)
+;
+;       Definition              Enter the CD device information
+;       Usable chars            Alphanumeric chars, "/" and "-"
+;       Number chars            8
+;       Entry rules             Pad fill with spaces on the right end
+;
+;       Notes / Examples        This little line describes wether this
+;                               is a single or multiple CD product.
+;
+;                               If this product is a single CD product,
+;                               then the following line will always be
+;
+;                                       "CD-1/1  ".
+;
+;                               If this product is a multiple CD product,
+;                               then the second digit after the "/" will
+;                               be set to the number of CD's in the product,
+;                               and the first digit before the "/" will be
+;                               set to the number that the current CD is
+;                               within the set.
+;
+;                               If you had a three CD product, then the
+;                               following line for the first CD will be
+;
+;                                       "CD-1/3  "
+;
+;                               For the second CD in the set
+;
+;                                       "CD-2/3  "
+;
+;                               And for the third and final CD in the set
+;
+;                                       "CD-3/3  "
+;
+
+;       .SDATA  "CD-1/3  "
+;       .SDATA  "CD-2/3  "
+;       .SDATA  "CD-3/3  "
+	.SDATA  "CD-1/1  "
+
+;
+; Edit the area code symbols below so it corresponds to the country you're
+; intending the game to run in.
+;
+; Area Symbol(s)                (Start offset 40H)
+;
+;       Definition              Area code defining the territories which the
+;                               product is designed to run within
+;       Usable chars            Only uppercase alpha chars specified in
+;                               'Entry rules' text
+;       Number of chars         16 (First 10 significant followed by six
+;                               mandatory trailing spaces)
+;       Entry rules             Multiple area symbols can be entered.
+;
+;                               Area symbols are entered one after the other
+;                               with no spaces or commas between them starting
+;                               from the leftmost position in the field. Any
+;                               remaining entries in the field must be space 
+;                               filled.
+;
+;                               Japan                                   "J"
+;                               Asia NTSC (Taiwan, The Philippines)     "T"
+;                               North America (U.S. and Canada)         "U"
+;                               South America NTSC (Brazil)             "B"
+;                               Korea                                   "K"
+;                               East Asia PAL (China and Middle East)   "A"
+;                               Europe PAL                              "E"
+;                               South America PAL                       "L"
+;
+;       Notes / Examples        To set product to Japan only the following
+;                               line would be
+;
+;                                       "J               "
+;
+;                               To set product to Europe only the following
+;                               line would be
+;
+;                                       "E               "
+;
+;                               To set product to USA only the following
+;                               line would be
+;
+;                                       "U               "
+;
+;                               It is imperative that these codes are set 
+;                               correctly. Saturn hardware sold in each of
+;                               the territories is encoded with a unique
+;                               area symbol, and the hardware area symbol
+;                               on the Saturn, and the soft area symbol 
+;                               encoded into your game on CD must allign,
+;                               or else your product will not work.
+;
+;				When the area code selection has been made,
+;				then the makefile must also be modified, to
+;				correctly link in the appropriate area driver
+;				code you are creating your product for. See
+;				the makefile for details.
+
+        .SDATA  "J               "
+;       .SDATA  "E               "
+;       .SDATA  "U               "
+;	.SDATA  "JTUBKAEL        "
+
+;
+; Peripherals                   (Start offset 50H)
+;
+;       Definition              Information defining the games complete
+;                               compatible input peripherals
+;       Usable chars            Alphanumeric chars only
+;       Number of chars         16
+;       Entry rules             Characters which define peripheral types
+;                               can be entered in any order, but must be
+;                               positioned such that there are no spaces 
+;                               or commas between them, and the first
+;                               character of the peripherals string must start
+;                               from the leftmost position in the field. Any
+;                               remaining entries in the field must be space 
+;                               filled.
+;
+;                               Peripheral characters type list follows :
+;
+;                               Control pad                             "J"
+;                               Analogue controller                     "A"
+;                               Mouse                                   "M"
+;                               Keyboard                                "K"
+;                               Steering controller                     "S"
+;                               Multitap                                "T"
+;
+;       Notes / Examples        One item which is not defined here (suitable
+;                               information is not available at time of
+;                               writing), is the GUN, (Known as the Virtua cop 
+;                               gun, or STUNNER).
+;
+;                               A code will probably have to be defined to be 
+;                               entered into this section if you have a gun
+;                               based game. The code will probably be "G". You
+;                               should check the situation from time to time
+;                               with SoE or SoA DTS. When information regarding
+;                               the GUN is made clear, then this code document
+;                               will be updated.
+;
+;                               If you were creating a racing game, which you
+;                               wanted to run with the following peripherals
+;
+;                               Control pad                             "J"
+;                               Analogue controller                     "A"
+;                               Steering controller                     "S"
+;                               Multitap                                "T"
+;
+;                               Then you would set the following line to be
+;
+;                                       "JAST            "
+;
+
+;       .SDATA  "JAST            "
+	.SDATA  "J               "
+
+;
+; Game title                    (Start offset 60H)
+;
+;       Definition              Game title
+;       Usable chars            Normally alphanumeric chars and spaces only,
+;                               however when multiple titles are being entered
+;                               (see entry rules text), then the characters
+;                               "/" "," "-" and ":" can be used.
+;       Number of chars         112
+;       Entry rules             When the name changes within the territory
+;                               in which the product is being sold, then 
+;                               multiple titles can be listed. There are no
+;                               specific rules governing the entry of multiple
+;                               titles, but they should be entered so that
+;                               they can be readily distinguished.
+;
+;                               Any areas of the field not occupied by name
+;                               title information must be filled with spaces.
+;
+
+	.SDATA  "GAME TITLE      "      ;60:
+	.SDATA  "                "      ;70:
+	.SDATA  "                "      ;80:
+	.SDATA  "                "      ;90:
+	.SDATA  "                "      ;A0:
+	.SDATA  "                "      ;B0:
+	.SDATA  "                "      ;C0:
+
+;
+; Do not change the following line
+;
+	.DATA.L H'00000000,H'00000000,H'00000000,H'00000000     ;D0:
+
+;
+; IP size                       (Start offset E0H)
+;
+;       Definition              Specify the initial program (IP) size in bytes
+;       Usable chars            Legal numeric digits for a 4 byte hex field.
+;
+	.DATA.L H'00001800              ;E0:
+	
+;
+; Do not change the following line
+;
+	.DATA.L H'00000000
+	
+;
+; Stack-M                       (Start offset E8H)
+;
+;       Definition              Address of stack pointer of Master SH2
+;       Usable chars            Legal numeric digits for a 4 byte hex field.
+;       Default (0 specified)   6001000H-6001FFFH is the stack area
+;
+	.DATA.L H'00000000              ;E8:
+	
+;
+; Stack-S                       (Start offset ECH)
+;
+;       Definition              Address of stack pointer of Slave SH2
+;       Usable chars            Legal numeric digits for a 4 byte hex field.
+;       Default (0 specified)   6000D00H-6000FFFH) is the stack area
+;
+	.DATA.L H'00000000              ;EC:
+
+;
+; 1st Read Address              (Start offset F0H)
+;
+;       Definition              LOAD address for the destination of files
+;                               transferred to the work RAM by the boot system
+;                               during display of the licensed SEGA logo
+;       Notes / Examples        The execution address (as distinct from this
+;                               load address), is specified in a seperate
+;                               file SMPSYS.C as follows :
+;
+;                               #define APP_ENTRY       (0x6010000)
+;
+;                               If you change this load address to some other
+;                               value, then you would normally have to make the
+;                               same address change to APP_ENTRY as specified
+;                               above.
+;
+	.DATA.L H'06010000              ;F0:
+
+;
+; 1st Read size                 (Start offset F4H)
+;
+;       Definition              Normally ignored when CD loading is performed
+;       
+;       
+	.DATA.L H'00000000
+	
+;
+; Do not change the following line
+;
+	.DATA.L H'00000000,H'00000000
+
+;
+; Do not change the following line
+;
+	.END
+
+;====== End of file ====================================================
+

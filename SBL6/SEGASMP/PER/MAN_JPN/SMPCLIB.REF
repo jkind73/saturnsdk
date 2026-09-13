@@ -1,0 +1,611 @@
+■目次（関数）
+  PER_GetTrigger()
+    指定されたタイミングでのトリガ情報を得ます。
+  PER_GetEdge()
+    指定された２つのタイミングの間で変化したトリガ情報を得ます。
+  PER_GetPressEdge()
+    指定された２つのタイミングの間で押されたトリガ情報を得ます。
+  PER_GetReleaseEdge()
+    指定された２つのタイミングの間で放されたトリガ情報を得ます。
+  PER_SetTriggerHandler()
+    指定されたＩＤを持つペリフェラル用のトリガハンドラを登録します。
+  PER_GetTriggerHandler()
+    指定されたＩＤを持つペリフェラル用のトリガハンドラを得ます。
+  PER_DisguiseTrigger()
+    トリガ情報をアサインテーブルにしたがって変換します。
+  PER_GetID()
+    サターンペリフェラルＩＤを得ます。
+  PER_GetType()
+    ペリフェラルタイプを得ます。
+  PER_GetSize()
+    ペリフェラルデータのサイズを得ます。
+  PER_GetAnalogXYZ()
+    標準アナログデバイスのＡ／Ｄコンバータの出力値を得ます。
+  PER_GetPointerXY()
+    標準ポインティングデバイスの移動量を得ます。
+  PER_GetKeyboardType()
+    標準キーボードデバイスのタイプを得ます。
+
+
+
+■目次（オブジェクト）
+  SysDevice
+    サターン標準ペリフェラルの基本型
+  SysDevDigital
+    サターン標準デジタルデバイス
+  SysDevAnalog
+    サターン標準アナログデバイス
+  SysDevPointer
+    サターン標準ポインティングデバイス
+  SysDevKeyboard
+    サターン標準キーボードデバイス
+  trigger_t
+    トリガ情報
+  assigment_t
+    トリガ情報変換テーブル（アサインテーブル）
+  trigger_handler_t
+    トリガハンドラ（デバイスからトリガ情報を取り出すためのハンドラ）
+
+
+
+■関数
+  □PER_GetID()
+    ○synopsis
+      #include  "per_x.h"
+      
+      id = PER_GetID( device );
+      
+      サターンペリフェラルＩＤを得ます。
+    
+    
+    ○parameters
+      const SysDevice   *device;
+      
+      デバイス情報
+    
+    
+    ○return value
+      int   id;
+      
+      サターンペリフェラルＩＤを返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetType()
+    ○synopsis
+      #include  "per_x.h"
+      
+      type = PER_GetType( device );
+      
+      ペリフェラルタイプを得ます。
+    
+    
+    ○parameters
+      const SysDevice   *device;
+      
+      デバイス情報
+    
+    
+    ○return value
+      int   type;
+      
+      ペリフェラルタイプを返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetSize()
+    ○synopsis
+      #include  "per_x.h"
+      
+      size = PER_GetSize( device );
+      
+      デバイスデータのサイズ（バイト数）を得ます。
+    
+    
+    ○parameters
+      const SysDevice   *device;
+      
+      デバイス情報
+    
+    
+    ○return value
+      int   size;
+      
+      デバイスデータのサイズを返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_SetTriggerHandler()
+    ○synopsis
+      #include  "per_x.h"
+      
+      PER_SetTriggerHandler( id, handler );
+      
+      指定のＩＤを持つペリフェラル用のトリガハンドラを設定します。
+      
+                ・・・・・
+      ここでは「指定のＩＤを持つデバイス用のハンドラを設定している」という
+      ことに注目してください。「指定のタイプ」ではありませんので、注意して
+      ください。
+      
+      ここで設定した関数（ハンドラ）は、PER_GetTrigger() に指定のＩＤを持
+      つデバイス情報が渡されたときに、コールされます。
+      例としては saturn/segasmp/per/smpclib/per_x1.c の中の GetTrigerDigital()
+      などを見てください。
+    
+    
+    ○parameters
+      int     id;
+      trigger_handler_t  handler;
+      
+      <id> は、サターンペリフェラルＩＤ
+      <handler> は、トリガハンドラ
+    
+    
+    ○return value
+      なし
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetTriggerHandler()
+    ○synopsis
+      #include  "per_x.h"
+      
+      handler = PER_GetTriggerHandler( id );
+      
+      指定のＩＤを持つペリフェラル用のトリガハンドラを得ます。
+    
+    
+    ○parameters
+      int    id;
+      
+      サターンペリフェラルＩＤ
+    
+    
+    ○return value
+      trigger_handler_t  handler;
+      
+      トリガハンドラを返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetTrigger()
+    ○synopsis
+      #include  "per_x.h"
+      
+      trigger = PER_GetTrigger( device );
+      
+      デバイスの種類に応じてトリガ情報を得ます。
+      
+      PER_SetTriggerHandler() によって登録されているＩＤを持つデバイスから
+      トリガ情報を取り出すには、同じく PER_SetTriggerHandler() によって登
+      録されている関数（ハンドラ）を用います。そういったものがない場合には、
+      デフォルトで用意されている関数（ハンドラ）を用います。この場合、予め
+      対応している入力ペリフェラルは下記のものだけですので、それ以外の入力
+      ペリフェラルからトリガ情報を得たい場合には、PER_SetTriggerHandler()
+      を使用してください。
+      
+      デフォルトで対応している入力ペリフェラル
+        デジタルデバイス
+          サターンペリフェラルＩＤとして 0x02 - 0x0f を返すもの
+        アナログデバイス
+          サターンペリフェラルＩＤとして 0x12 - 0x1f を返すもの
+        ポインティングデバイス
+          サターンペリフェラルＩＤとして 0x22 - 0x2f を返すもの
+        キーボードデバイス
+          サターンペリフェラルＩＤとして 0x33 - 0x3f を返すもの
+        メガドライブ用３Ｂパッド
+          サターンペリフェラルＩＤとして 0xe1 を返すもの
+        メガドライブ用６Ｂパッド
+          サターンペリフェラルＩＤとして 0xe2 を返すもの
+        メガドライブ用マウス
+          サターンペリフェラルＩＤとして 0xe3 を返すもの
+    
+    
+    ○parameters
+      const SysDevice *device;
+      
+      デバイス情報
+    
+    
+    ○return value
+      trigger_t  trigger;
+      
+      トリガ情報を返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetEdge()
+    ○synopsis
+      #include  "per_x.h"
+      
+      edge = PER_GetEdge( t1, t2 );
+      
+      トリガのエッジ情報を得ます。
+      
+      エッジ情報とは <t1> と <t2> の２つのタイミングのあいだで変化したトリ
+      ガの情報のことをいいます。
+    
+    
+    ○parameters
+      trigger_t  t1;
+      trigger_t  t2;
+      
+      <t1> と <t2> はトリガ情報。
+      <t1> と <t2> の時間的な順序は問いません。
+    
+    
+    ○return value
+      trigger_t  edge;
+      
+      トリガのエッジ情報を返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetPressEdge()
+    ○synopsis
+      #include  "per_x.h"
+      
+      edge = PER_GetPressEdge( prev, current );
+      
+      トリガのプレスエッジ（押下エッジ）情報を得ます。
+      
+      プレスエッジ情報とは <prev> と <current> の２つのタイミングのあいだ
+      にリリース状態からプレス状態に変化したトリガの情報のことをいいます。
+    
+    
+    ○parameters
+      trigger_t  prev;
+      trigger_t  current;
+      
+      <prev> と <current> は共にトリガ情報。
+      時間的に（ <prev> ＜ <current> ）という関係を期待しています。
+    
+    
+    ○return value
+      trigger_t  edge;
+      
+      トリガのプレスエッジ情報を返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetReleaseEdge()
+    ○synopsis
+      #include  "per_x.h"
+      
+      edge = PER_GetReleaseEdge( prev, current );
+      
+      トリガのリリースエッジ（解放エッジ）情報を得ます。
+      
+      リリースエッジ情報とは <prev> と <current> の２つのタイミングのあい
+      だにプレス状態からリリース状態に変化したトリガの情報のことをいいます。
+    
+    
+    ○parameters
+      trigger_t  prev;
+      trigger_t  current;
+      
+      <prev> と <current> は共にトリガ情報。
+      時間的に（ <prev> ＜ <current> ）という関係を期待しています。
+    
+    
+    ○return value
+      trigger_t  edge;
+      
+      トリガのリリースエッジ情報を返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_DisguiseTrigger()
+    ○synopsis
+      #include  "per_x.h"
+      
+      trigger = PER_DisguiseTrigger( assignment, trigger );
+      
+      トリガ情報<trigger> をアサインテーブル<assignment> に従って変換しま
+      す。<assignment> に NULL を指定すると、なんの変換もせずに <trigger>
+      をそのまま返します。
+      
+      アサインテーブルとはトリガ情報の配列で、配列のインデックスがトリガ情
+      報のビット番号に対応するテーブルのことです。
+      例えば <trigger> の 0 ビット目と 4 ビット目が TRUE だった場合の戻り
+      値は ( assignment[0] | assignment[4] ) になります。
+      
+      普通は assignment[] の各メンバには、ただ１つのトリガを対応させます。
+      １つのメンバに複数のトリガを対応させた場合には、１つのトリガが押され
+      ただけで、複数のトリガが押されたかのように振る舞うので注意が必要です。
+    
+    
+    ○parameters
+      const assignment_t *assignment;
+      trigger_t    trigger;
+      
+      <assignment> は、トリガ情報のアサインテーブル
+      <trigger> は、トリガ情報
+      
+      <assignment> に NULL を渡すと何の変換もせずに <trigger> をそのまま返
+      します。
+    
+    
+    ○return value
+      trigger_t  trigger;
+      
+      トリガ情報を返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetAnalogXYZ()
+    ○synopsis
+      #include  "per_x.h"
+      
+      PER_GetAnalogXYZ( analog, &x, &y, &z );
+      
+      アナログデバイスからＸＹＺ方向のＡ／Ｄコンバータの出力値を得ます。
+    
+    
+    ○parameters
+      const SysDevAnalog *analog;
+      int     *x;
+      int     *y;
+      int     *z;
+      
+      <analog> はアナログデバイス情報。
+      <x> <y> <z> はそれぞれＸＹＺ方向のＡ／Ｄコンバータの出力値。
+      
+      <x> <y> <z> に NULL を渡すとそこには何も返されません。
+      
+      <x> には（右）-127 ～ +127（左）が返されます。
+      <y> には（上）-127 ～ +127（下）が返されます。
+      <z> には（下）-127 ～ +127（上）が返されます。
+    
+    
+    ○return value
+      なし
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetKeyboardType()
+    ○synopsis
+      #include  "per_x.h"
+      
+      type = PER_GetKeyboardType( keyboard );
+      
+      キーボードタイプを得ます。
+    
+    
+    ○parameters
+      const SysDevKeyboard *keyboard;
+      
+      キーボードデバイス情報
+    
+    
+    ○return value
+      int    type;
+      
+      キーボードタイプを返します。
+    
+    
+    ○influence/reference objects
+      なし
+  
+  
+  □PER_GetPointerXY()
+    ○synopsis
+      #include  "per_x.h"
+      
+      PER_GetPointerXY( pointer, &dx, &dy );
+      
+      ポインティングデバイスからＸＹ方向の移動量を得ます。
+      
+      Ｘは右への移動が負数、左への移動が正数で表わされます。
+      Ｙは上への移動が負数、下への移動が正数で表わされます。
+    
+    
+    ○parameters
+      const SysDevPointer *pointer;
+      int     *dx;
+      int     *dy;
+      
+      <pointer> はポインティングデバイス情報。
+      <dx> <dy> はそれぞれＸＹ方向の移動量。
+      
+      <dx> <dy> に NULL を渡すとそこには何も返されません。
+      
+      <dx> には（右）-255 ～ 255（左）が返されます。
+      <dy> には（上）-255 ～ 255（下）が返されます。
+    
+    
+    ○return value
+      なし
+    
+    
+    ○influence/reference objects
+      なし
+
+
+
+■オブジェクト
+  □SysDevice
+    サターン標準ペリフェラルを表わすオブジェクトです。
+    すべての標準ペリフェラルは、このオブジェクトから派生します。
+    このオブジェクトは、ペリフェラルライブラリの返すデータそのものです。
+    .type
+      サターンペリフェラルタイプ
+    .size
+      ペリフェラルデータサイズ
+    .data[]
+      データ
+  
+  □SysDevDigital
+    サターン標準デジタルデバイスを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevice を継承しています。
+    すべての標準デジタルデバイスは、このオブジェクトから派生します。
+    .type
+      サターンペリフェラルタイプ（==TYPE_DIGITAL）
+    .size
+      ペリフェラルデータサイズ
+    .data[]
+      トリガ情報
+    .expended[]
+      拡張データ
+  
+  □SysDevAnalog
+    サターン標準アナログデバイスを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevice を継承しています。
+    すべての標準アナログデバイスは、このオブジェクトから派生します。
+    .type
+      サターンペリフェラルタイプ（==TYPE_ANALOG）
+    .size
+      ペリフェラルデータサイズ
+    .data[]
+      トリガ情報
+    .ax
+      Ｘ方向のＡ／Ｄコンバータの出力値（左0～右255）
+    .ay
+      Ｙ方向のＡ／Ｄコンバータの出力値（上0～下255）
+    .az
+      Ｚ方向のＡ／Ｄコンバータの出力値（下0～上255）
+    .expended[]
+      拡張データ
+  
+  □SysDevPointer
+    サターン標準ポインティングデバイスを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevice を継承しています。
+    すべての標準ポインティングデバイスは、このオブジェクトから派生します。
+    .type
+      サターンペリフェラルタイプ（==TYPE_POINTER）
+    .size
+      ペリフェラルデータサイズ
+    .status
+      トリガ情報、移動量の符号、移動量のオーバーフロー。
+    .dx
+    .dy
+      ＸＹ方向の移動量の絶対値（0～255）
+    .expended[]
+      拡張データ
+  
+  □SysDevKeyboard
+    サターン標準キーボードデバイスを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevice を継承しています。
+    すべての標準キーボードデバイスは、このオブジェクトから派生します。
+    .type
+      サターンペリフェラルタイプ（==TYPE_KEYBOARD）
+    .size
+      拡張データ
+    .data[]
+      トリガ情報、キーボードタイプ。
+    .shift
+      シフトキー情報（K_CAPS,K_NUM,K_SCROLL,K_BREAK,K_MAKE）
+    .c
+      文字ナンバー
+    .expended[]
+      拡張データ
+  
+  □DevMD3B
+    メガドライブ３ボタンパッドを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevice を継承しています。
+    .type
+      サターンペリフェラルタイプ（==TYPE_MD）
+    .size
+      ペリフェラルデータサイズ（==1）
+    .data[]
+      トリガ情報
+  
+  □DevMD6B
+    メガドライブ６ボタンパッドを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevDigital を継承しています。
+    .type
+      サターンペリフェラルタイプ（==TYPE_MD）
+    .size
+      ペリフェラルデータサイズ（==2）
+    .data[]
+      トリガ情報
+  
+  □DevMDMouse
+    メガドライブマウスを表わすオブジェクトです。
+    このオブジェクトは、オブジェクト SysDevPointer を継承しています。
+    .type
+      サターンペリフェラルタイプ（==TYPE_MD）
+    .size
+      ペリフェラルデータサイズ（==3）
+    .status
+      トリガ情報、移動量の符号、移動量のオーバーフロー。
+    .dx
+    .dy
+      ＸＹ方向の移動量の絶対値（0～255）
+  
+  □trigger_t
+    TRG_A       Ａボタン
+    TRG_B       Ｂボタン
+    TRG_C       Ｃボタン
+    TRG_X       Ｘボタン
+    TRG_Y       Ｙボタン
+    TRG_Z       Ｚボタン
+    TRG_L       Ｌボタン
+    TRG_R       Ｒボタン
+    TRG_UP      ↑
+    TRG_DOWN    ↓
+    TRG_LEFT    ←
+    TRG_RIGHT   →
+    TRG_START   スタートボタン
+    
+    標準ポインティングデバイスの  右  のボタンは TRG_A
+    標準ポインティングデバイスの真ん中のボタンは TRG_C
+    標準ポインティングデバイスの  左  のボタンは TRG_B
+    標準ポインティングデバイスには TRG_START,A,B,C しかない。
+    メガドライブ６Ｂパッドのモードボタンは TRG_R
+    メガドライブ６Ｂパッドには TRG_L はない。
+    メガドライブ３Ｂパッドには TRG_X,Y,Z,L,R はない。
+    レーシングコントローラーには Y,Z 方向のアナログ出力はない。
+    レーシングコントローラーには TRG_LEFT,RIGHT,L,R はない。
+    
+    TRG_MODE  メガドライブ６ボタンパッドのモードボタン
+    TRG_RESET  ソフトフェアリセット
+  
+  □assignment_t
+    メンバの順番を変更してはいけない。メンバの順番は trigger_t 用の定数
+    'TRG_???' のビット並びと対応しています。
+  
+  □trigger_handler_t
+    デバイス情報からトリガ情報を取り出す関数のこと。PER_SetTriggerHandler()
+    で設定されたハンドラは、PER_GetTrigger() に指定したＩＤのデバイス情報
+    が渡されたときにコールされます。
+    例としては saturn/segasmp/per/smpclib/per_x1.c の中の GetTrigerDigital()
+    などを見てください。
+
+
+
+

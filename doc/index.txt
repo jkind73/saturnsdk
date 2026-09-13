@@ -1,0 +1,8 @@
+File Name  	Description  	Size  	Date
+COMMPROB.ZIP 	Guide to common problems during build & link (Word document) 	2991 bytes 	08 Jan 1998 19:21:51
+HILOMEM.ZIP 	Locating code in high and low memory - example 	1357 bytes 	08 Jan 1998 19:21:51
+OVLEGSAT.ZIP 	Overlays for Saturn - example 	4719 bytes 	08 Jan 1998 19:21:51
+SAT32MIG.ZIP 	Guide to migrating to 32-bit tools (recommended!) (Word document) 	4091 bytes 	08 Jan 1998 19:21:51
+SATMAN.ZIP 	Psy-Q Manual for Saturn (DOS) - Adobe Acrobat 2.0 Document 	930544 bytes 	29 Sep 1999 13:38:26
+SELFHELP.ZIP 	Guide to troubleshooting basic compilation problems (Word document) 	6899 bytes 	08 Jan 1998 19:21:59
+SHAREVAR.ZIP 	Sharing a variable between processors - example 	909 bytes 	08 Jan 1998 19:21:59

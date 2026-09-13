@@ -1,0 +1,81 @@
+/* scsi.h
+ * 4/2/1994
+*/
+
+/* This file is from the code to the CARTDEV firmware, it has the defines
+ * for the specific supported events and errors in the firmware.
+*/
+
+
+/* SCSI Sense Keys */
+
+#define    NoSense                  0x00
+#define    RecoveredError           0x01
+#define    NotReady                 0x02
+#define    MediumError              0x03
+#define    HardwareError            0x04
+#define    IllegalRequest           0x05
+#define    UnitAttention            0x06
+#define    DataProtect              0x07
+#define    BlankCheck               0x08
+#define    eGame                    0x09
+#define    CopyAborted              0x0A
+#define    AbortedCommand           0x0B
+#define    Equal                    0x0C
+#define    VolumeOverflow           0x0D
+#define    Miscompare               0x0E
+
+
+/* SCSI Additional Sense Codes and Additional Sense Code Qualifiers */
+
+#define NoAdditional                0x0000
+#define InvalidCommand              0x2000
+#define InvalidFieldInCDB           0x2400
+#define LUNotSupported              0x2500
+#define WriteProtected              0x2700
+#define PowerOnResetBDReset         0x2900
+#define InvalidBitsInIdentify       0x3D00
+#define MessageError                0x4300
+#define IDEMessageReceived          0x4800
+#define OverlappedCommands          0x4E00
+
+
+/* SCSI Vendor Specific Additional Sense Codes
+ * and Additional Sense Code Qualifiers
+ * follow eGame Vendor Specific Sense Key */
+
+#define eGameAddress                0x0100    /* invalid Game Address */
+#define eAddrTransferCount          0x0101
+#define eAddrDirection              0x0102
+#define eDPRTransferCount           0x0103
+#define eBufferNumber               0x0200
+#define eBufferDirection            0x0201
+#define eBufferAddress              0x0202
+#define eBufferTransferCount        0x0203
+#define eBufferReady                0x0204
+#define eInterruptDisabled          0x0300
+#define eControlGame                0x0400
+#define eSoundBoard                 0x0401
+#define eCheckSumROM                0x0402  /* Boot loader, control game failed....*/
+#define ePageChecksum               0x0403  /* Page in memory failed checksum......*/
+#define eProgram                    0x0404
+
+/* SCSI Send Diagnostic bits */
+#define SelfTest                    0x04
+#define DevOfL                      0x02    /* device off line */
+#define UnitOfL                     0x01    /* unit off line */
+
+
+/* SCSI Status */
+
+#define    Good                     0x00
+#define    CheckCondition           0x02
+#define    ConditionMet             0x04
+#define    Busy                     0x08
+#define    ReservationConflict      0x18
+#define    CommandTerminated        0x22
+
+
+/* Selected SCSI Operation Codes
+*/
+#define  CartDev_CONTROL            0xdd     // vendor specific command

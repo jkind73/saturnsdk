@@ -1,0 +1,1258 @@
+/*
+ // HSI For Win '95 & NT
+ // Uses Win32s 32 bit ASPI dll.
+ //
+ //     scsi.c -
+ //
+ //         contains SCSI/ASPI interface code for the Host SCSI Interface 
+ //         library -- for the SEGA Game CARTDEV development environment.
+ //     
+ //     
+ //        Written by the Igneous Group under agreement with Sega Of America.
+ //          The Igneous Group
+ //          1836 17th Ave, Suite D
+ //          Santa Cruz, CA 95062
+ //          408 475 8194 voice
+ //          408 475 8193 fax
+ //         
+ //          Geoff Caras   GeoffC@igneous.com
+ //
+ //          Copyright (C) 1995, Sega Of America, Inc.
+ //          All Rights Reserved
+ //
+ //
+ //     NOTES
+ //            
+ //     REFERENCES
+ //            
+ //     LANGUAGE
+ //            ANSI C
+ //
+ //     LIB          This code comprises the HSI library.
+ //            
+ //     SEE ALSO The include files (hsi.h) for application info.
+ //
+ //     These functions are defined here:
+ //
+ //         EC          HSI_AllocateChannel(ChannelID *cid)
+ //         EC          HSI_ReleaseChannel(ChannelID cid)
+ //         EC          HSI_SetSCSI_ID(BYTE id)
+ //         BYTE        HSI_GetSCSI_ID(void)
+ //         CartdevT    HSI_GetCartdevType(void) 
+ //         EC          HSI_SCSIInquiryText(char *buffer)
+ //         void        HSI_SCSIHostText(char *p, BYTE *id)
+ //         EC          HSI_ResetSCSI(void)
+ //         EC          HSI_ScanSCSIBus(void)
+ //         EC          InterpretASPIStatus(BYTE status, ChannelID cid)
+ //         EC          HSI_TestUnitReady(BYTE lun)
+ //         EC          HSI_RequestSense(BYTE lun, BYTE *SensePtr)
+ //         EC          HSI_ProcessCheckCondition(ChannelID cid)
+ //
+ //     These globals are declared here:
+ // 
+ //        BYTE HSI_QID;
+ //        BYTE HSI_QHost;
+ //        BYTE HSI_NumAdapters;
+ //        EC   HSI_LastError;
+ //        
+ //     MODS
+ //     GBC 10 Aug 95   Initial Creation, from the original HSI32 DOS code. Modified heavily due
+ //                     to the new data structures as provided by Win32s ASPI implementation...
+ //     GBC 15 Aug 95   Modified ALL of the ASPI calling functions to use event posting instead
+ //                     of the DOS style polling with timeout.
+*/
+
+
+
+
+#include    <windows.h>
+
+#include    "scsidefs.h"
+#include    "wnaspi32.h"
+
+#include    "scsi.h"
+
+#include    "hsi32win.h"
+#include    "error.h"
+
+#include    "private.h"
+
+
+typedef struct {
+   BYTE ErrorCode;
+   BYTE SegmentNumber;
+   BYTE SenseKey;
+   BYTE Info[4];
+   BYTE AddSenseLen;
+   BYTE CmdInfo[4];
+   BYTE AddSenseCode;
+   BYTE AddSenseQual;
+   BYTE FRUCode;
+   BYTE SenseKeySpe[3];
+}ReqSenseT;
+
+
+/* The data structure for the standard INQUIRY data format...
+*/
+typedef struct {
+   BYTE  DeviceType;
+   BYTE  DevTModifier;
+   BYTE  version;
+   BYTE  respdataformat;
+   BYTE  AddLen;
+   BYTE  reserved[2];
+   BYTE  bits;
+   char  VendorID[8];
+   char  ProductID[16];
+   char  Rev[4];
+   char  VendorTxt[20];
+   char  future[40];
+}InquiryT;
+
+
+/* GLOBAL VARIABLES FOR THE LIBRARY:
+*/
+
+/* These two globals are the SCSI ID and the SCSI LUN used by
+ * the library functions.
+*/
+BYTE   HSI_QID;
+
+BYTE   HSI_QHost;          // The INDEX of the ID of the host adapter to use
+BYTE   HSI_NumAdapters;    // The number of host adapters present.
+
+
+DWORD   ASPI_Status;
+
+CartdevT        HSI_CartdevType;    // The type of cartdev found.
+
+EC              HSI_LastError;
+
+HostT           Hosts[MAX_HOST_ADAPTERS];
+
+void           *LastSRB;
+void           *LastSenseP;
+
+boolean         ASPI_Inited  = 0;
+boolean         CartdevFound;
+
+#define  SPACE  ' '
+
+
+
+
+SRB_BusDeviceReset  ResetSRB;
+SRB_ExecSCSICmd     ExecSRB;
+
+
+
+/*************************************************************
+ //     HSI_AllocateChannel -
+ //
+ //          Allocates a logical channel to communicate to the device on...
+ //          Equates directly to LUN.
+ //      
+ //
+ //     ENTRY      stat = HSI_AllocateChannel(ChannelID *)
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            tbd
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  03 Feb 94     Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+*/
+EC
+HSI_AllocateChannel(ChannelID *cid)
+{
+    int     i;
+    EC      retcode;
+
+    retcode  = err_NOERROR;      // be optimistic
+
+    // Scan the list of luns in the host structure, if one is available
+    // allocate it...
+    for(i = 0; i < 8; i++) {
+
+        if(Hosts[HSI_QHost].Targets[HSI_QID].Lun[i] != TRUE) {
+
+            Hosts[HSI_QHost].Targets[HSI_QID].Lun[i] = TRUE; // allocate it
+            *cid = i;                // tell the caller he got one!
+            return(retcode);  // exit the loop now!
+        }
+    }  // end for(i...
+
+    // If we get here then there were no available channels left, create error
+    retcode = MakeEC(err_LIB, err_NoChannelsAvail);
+
+    return(retcode);
+
+}
+
+/*************************************************************
+ //     HSI_ReleaseChannel -
+ //
+ //          De-allocates a logical channel.
+ //      
+ //
+ //     ENTRY      stat = HSI_ReleaseChannel(ChannelID)
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            tbd
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  03 Feb 94     Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+*/
+EC
+HSI_ReleaseChannel(ChannelID cid)
+{
+    EC      retcode;
+
+    retcode  = err_NOERROR;      // be optimistic
+
+    if(Hosts[HSI_QHost].Targets[HSI_QID].Lun[cid] != TRUE) {
+
+        retcode = MakeEC(err_LIB, err_ChannelNotAlloc);
+
+    } else {
+
+        Hosts[HSI_QHost].Targets[HSI_QID].Lun[cid] = FALSE; // de-allocate it
+
+    }
+
+    return(retcode);
+
+}
+
+
+
+/*************************************************************
+ //     HSI_SetSCSI_ID - 
+ //
+ //          Sets the SCSI ID and LUN used by the other functions in the HSI
+ //          interface library.
+ //      
+ //
+ //     ENTRY      stat = HSI_SetSCSI_ID(id, lun)
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            if the id or lun are invalid will return err_ID_INVALID
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            -none-
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  25 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+*/
+EC
+HSI_SetSCSI_ID(BYTE id)
+{
+     EC retcode;
+
+     // First make sure id is valid
+
+     if(id > 7) {
+          retcode = MakeEC(err_SCSI, err_ID_INVALID);
+          
+     } else {
+
+          HSI_QID  = id;
+
+     }
+     
+     retcode        = err_NOERROR;
+     HSI_LastError  = retcode;
+
+     return(retcode);
+}
+
+/*************************************************************
+ //     HSI_GetSCSI_ID - 
+ //
+ //          Gets the SCSI ID used by the other functions in the HSI
+ //          interface library.
+ //      
+ //
+ //     ENTRY      stat = HSI_GetSCSI_ID(id)
+ //
+ //     EXIT
+ //            void
+ //
+ //     ERRORS
+ //            -none-
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            -none-
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  25 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+*/
+BYTE
+HSI_GetSCSI_ID(void)
+{
+     // Return the current SCSI ID value...
+     return(HSI_QID);
+}
+
+
+/*************************************************************
+ //    HSI_GetCartdevType
+ //
+ //        Gets the type of CARTDEV found...
+ //     
+ //
+ //    NOTES
+ //        Written by the Igneous Group under agreement with
+ //        Sega Of America, Inc.
+ //         
+ //    MODS
+ //            GBC  02 Jun 94    Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+*/
+CartdevT
+HSI_GetCartdevType(void) 
+{
+    return(HSI_CartdevType);    
+}
+
+
+
+/*************************************************************
+ //     HSI_SCSIInquiryText - 
+ //
+ //          Returns the inquiry text associated with the currently selected
+ //          SCSI ID.
+ //      
+ //
+ //     ENTRY      stat = HSI_SCSIInquiryText(buff)
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            if there is no target device on the currently selected SCSI ID
+ //            err_NOTARGET will be returned.
+ //            
+ //     MEMORY
+ //            allocated by caller, 80 bytes for string.
+ //            
+ //     ROUTINES
+ //            strlen and strncpy used
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  25 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+ //
+*/
+EC
+HSI_SCSIInquiryText(char *buffer)
+{
+     int     i;
+     int     c;
+     EC      retcode;
+
+     retcode = err_NOERROR;
+
+     if(ASPI_Inited == 0) {
+          // No ASPI Driver! Force No target device on that ID message
+          retcode = MakeEC(err_SCSI, err_NOTARGET);
+
+     } else if(HSI_QID == Hosts[HSI_QHost].HostID) {
+
+          // Copy the data from the HOST Text string to the hosts memory space
+
+          for(i=0; i < 50; i++) {
+
+                c = Hosts[HSI_QHost].HostText[i];
+                *buffer++ = isgraph(c) ? c : SPACE;
+
+          }
+
+          *buffer = '\0';
+
+     } else if(Hosts[HSI_QHost].Targets[HSI_QID].DeviceType > 0x80) {
+
+          // No target device on that ID...
+          retcode = MakeEC(err_SCSI, err_NOTARGET);
+
+     } else {
+
+          // Copy the data from the inquiry string to the hosts memory space
+
+          for(i=0; i < 32; i++) {
+
+                c = Hosts[HSI_QHost].Targets[HSI_QID].InquiryText[i];
+                *buffer++ = isgraph(c) ? c : SPACE;
+
+          }
+
+          *buffer = '\0';
+     }
+
+     HSI_LastError = retcode;
+     return(retcode);
+
+}  // end HSI_SCSIInquiryText()
+
+
+
+
+/*************************************************************
+ //     HSI_SCSIHostText - 
+ //
+ //          Returns data about the host adapter, id and text.
+ //          SCSI ID.
+ //      
+ //
+ //     ENTRY      HSI_SCSIHostText()
+ //
+ //     EXIT
+ //            - none -
+ //
+ //     ERRORS
+ //            - none -
+ //            
+ //     MEMORY
+ //            allocated by caller, 80 bytes for string.
+ //            
+ //     ROUTINES
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  26 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Unmodified for the Win'95 Port.
+*/
+void
+HSI_SCSIHostText(char *p, BYTE *id)
+{
+     int     i;
+     int     c;
+
+     for(i=0; i < 50; i++) {
+
+          c = Hosts[HSI_QHost].HostText[i];
+          *p++ = isgraph(c) ? c : SPACE;
+
+     }
+     
+     *p = '\0';
+
+     *id = Hosts[HSI_QHost].HostID;
+}
+
+
+/*************************************************************
+ //     HSI_ResetSCSI - 
+ //
+ //          Resets the SCSI target that is currently selected.
+ //      
+ //
+ //     ENTRY      stat = HSI_ResetSCSI()
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            uses the ASPI interface routines.
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  25 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Modified for the Win'95 Port. Data structures are new...
+*/
+
+EC
+HSI_ResetSCSI(void)
+{
+    EC      retcode;
+
+    HANDLE  ASPICompletionEvent;
+    DWORD   ASPIEventStatus;
+
+
+    if(CartdevFound == FALSE)
+        return(MakeEC(err_LIB, err_NoCartdevFound));
+
+    // Creat an event, no security attributes, manual reset, unsignaled, unnamed
+
+    if((ASPICompletionEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
+        // Unable to create the completion event.
+        if(HSIDebug != 0) {
+            MessageBox( HSI_hwnd,
+                        "HSI Library -- HSI_ResetSCSI()",
+                        "Unable to create completion event.",
+                        MB_ICONSTOP
+                       );
+
+        }
+
+        return(MakeEC(err_LIB, err_CreateEvent));
+    }
+
+
+    memset(&ResetSRB, 0, sizeof(ResetSRB));
+
+    ResetSRB.SRB_Cmd        = SC_RESET_DEV;
+    ResetSRB.SRB_Flags      = SRB_EVENT_NOTIFY;
+    ResetSRB.SRB_HaId       = HSI_QHost;
+    ResetSRB.SRB_Target     = HSI_QID;
+    ResetSRB.SRB_PostProc   = ASPICompletionEvent;
+
+    LastSRB     = (void *)&ResetSRB;
+    LastSenseP  = NULL;
+
+    ASPIStatus = SendASPI32Command((LPSRB) &ResetSRB);
+
+
+    if(ResetSRB.SRB_Status == SS_PENDING)
+        ASPIEventStatus = WaitForSingleObject(ASPICompletionEvent, HSI_TimeOut);
+
+
+    switch(ASPIEventStatus) {
+        case    WAIT_OBJECT_0:
+            ResetEvent(ASPICompletionEvent);
+            break;
+
+        case    WAIT_ABANDONED:
+            ResetEvent(ASPICompletionEvent);
+            CloseHandle(ASPICompletionEvent);
+            return(MakeEC(err_LIB, err_ThreadTerminated));
+            break;
+
+        case    WAIT_TIMEOUT:
+            ResetEvent(ASPICompletionEvent);
+            CloseHandle(ASPICompletionEvent);
+            return(MakeEC(err_SCSI, err_TimeOut));
+            break;
+
+        default:
+            return(MakeEC(err_SCSI, err_UNKNOWNERR));
+    }
+
+    retcode = InterpretASPIStatus(ResetSRB.SRB_Status, 0);
+
+    HSI_LastError = retcode;
+
+    CloseHandle(ASPICompletionEvent);
+
+    return(retcode);
+}
+
+/*************************************************************
+ //     HSI_ScanSCSIBus -
+ //
+ //          Scans the SCSI bus looking for target devices...
+ //      
+ //
+ //     ENTRY      stat = HSI_ScanSCSIBus()
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            uses the ASPI interface routines.
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  25 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Modified for the Win'95 Port. Data structures are new...
+*/
+
+EC
+HSI_ScanSCSIBus(void)
+{
+    int         i,
+                idx,
+                LocalSCSIID;
+                
+    EC          retcode;
+
+    InquiryT    inq;
+
+
+    HANDLE  ASPICompletionEvent;
+    DWORD   ASPIEventStatus;
+
+
+    retcode = err_NOERROR;
+
+
+    // Creat an event, no security attributes, manual reset, unsignaled, unnamed
+
+    if((ASPICompletionEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
+        // Unable to create the completion event.
+        if(HSIDebug != 0) {
+            MessageBox( HSI_hwnd,
+                        "HSI Library -- HSI_ScanSCSIBus()",
+                        "Unable to create completion event.",
+                        MB_ICONSTOP
+                       );
+
+        }
+
+        return(MakeEC(err_LIB, err_CreateEvent));
+    }
+
+    
+    for(LocalSCSIID = 0; LocalSCSIID <= 7; LocalSCSIID++) {
+    
+        // Make sure the Inquiry data space is clear
+        memset((void *)&inq, 0, sizeof(InquiryT));
+        memset(&ExecSRB, 0, sizeof(ExecSRB));
+
+        ExecSRB.SRB_Cmd             = SC_EXEC_SCSI_CMD;
+        ExecSRB.SRB_HaId            = HSI_QHost;
+        ExecSRB.SRB_Flags           = SRB_DIR_IN | SRB_EVENT_NOTIFY;
+        ExecSRB.SRB_Target          = LocalSCSIID;
+        ExecSRB.SRB_BufLen          = (DWORD)sizeof(InquiryT);
+        ExecSRB.SRB_SenseLen        = SENSE_LEN;
+        ExecSRB.SRB_BufPointer      = (BYTE *)&inq;
+        ExecSRB.SRB_PostProc        = ASPICompletionEvent;
+
+        ExecSRB.SRB_CDBLen          = 6;
+
+        ExecSRB.CDBByte[0]          = SCSI_INQUIRY;
+        ExecSRB.CDBByte[1]          = 0;
+        ExecSRB.CDBByte[2]          = 0;
+        ExecSRB.CDBByte[3]          = 0;
+        ExecSRB.CDBByte[4]          = sizeof(InquiryT);
+        ExecSRB.CDBByte[5]          = 0;
+
+        LastSRB        = (void *)&ExecSRB;
+        LastSenseP     = &ExecSRB.SenseArea[0];
+                                                 
+        ASPIStatus = SendASPI32Command((LPSRB) &ExecSRB);
+
+
+        ASPIEventStatus     = WAIT_OBJECT_0;
+        if(ExecSRB.SRB_Status == SS_PENDING)
+            ASPIEventStatus = WaitForSingleObject(ASPICompletionEvent, HSI_TimeOut);
+
+
+        switch(ASPIEventStatus) {
+            case    WAIT_OBJECT_0:
+                ResetEvent(ASPICompletionEvent);
+                break;
+
+            case    WAIT_ABANDONED:
+                ResetEvent(ASPICompletionEvent);
+                CloseHandle(ASPICompletionEvent);
+                return(MakeEC(err_LIB, err_ThreadTerminated));
+                break;
+
+            case    WAIT_TIMEOUT:
+                ResetEvent(ASPICompletionEvent);
+                CloseHandle(ASPICompletionEvent);
+                return(MakeEC(err_SCSI, err_TimeOut));
+                break;
+
+            default:
+                return(MakeEC(err_SCSI, err_UNKNOWNERR));
+        }
+        
+        if(ExecSRB.SRB_Status ==  SS_COMP) {
+            // Command completed ok...
+
+            // Copy the device type into the saved data structure...
+            Hosts[HSI_QHost].Targets[LocalSCSIID].DeviceType = (inq.DeviceType & 0x1f);
+
+            idx = 0;
+
+            // Now copy the vendor, product, rev and vendor specific text into the struct.
+            for(i=0; i<8; i++) 
+                Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = inq.VendorID[i];
+               
+            Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = SPACE;
+
+            for(i=0; i<16; i++) 
+                Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = inq.ProductID[i];
+
+            Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = SPACE;
+
+            for(i=0; i<4; i++) 
+                Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = inq.Rev[i];
+
+            Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = SPACE;
+
+            for(i=0; i < 20; i++)
+                Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = 
+                    ((inq.VendorTxt[i] > SPACE) ? inq.VendorTxt[i] : SPACE);
+
+            Hosts[HSI_QHost].Targets[LocalSCSIID].InquiryText[idx++] = '\0';
+               
+        } else {
+
+            // No target out there...
+            Hosts[HSI_QHost].Targets[LocalSCSIID].DeviceType = 0x8f;     // no device
+        }
+
+
+    } // end for(LocalSCSIID = 0; LocalSCSIID <= 7; LocalSCSIID++)
+
+    HSI_LastError = retcode;
+
+    CloseHandle(ASPICompletionEvent);
+
+    return(retcode);
+}
+
+
+
+/*************************************************************
+ //     InterpretASPIStatus - 
+ //
+ //          Maps the ASPI status into an EC value 
+ //      
+ //
+ //     ENTRY      stat = InterpresASPIStatus(status)
+ //
+ //     EXIT
+ //            returns an EC - error code, used as a value NOT an error condition.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            -none-
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  26 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Modified for the Win'95 Port. Added new SRB status codes as documented
+ //                               in WNASPI32.h
+*/
+
+EC
+InterpretASPIStatus(BYTE status, ChannelID cid)
+{
+    EC retcode;
+
+    switch((unsigned int)status) {
+
+        case SS_PENDING:
+            retcode = err_NOERROR;
+            break;
+
+        case SS_COMP:
+            retcode = err_NOERROR;
+            break;
+
+        case SS_ABORTED:
+        case SS_ABORT_FAIL:
+            retcode = MakeEC(err_SCSI, err_REQ_ABORTED);
+            break;
+
+        case SS_ERR:
+            retcode = HSI_ProcessCheckCondition(cid);
+
+            if(retcode == err_NOERROR)      // something really weird happened!
+                retcode = MakeEC(err_SCSI, err_COMPLETEDERR);
+
+            break;
+
+        case SS_INVALID_CMD:
+            retcode = MakeEC(err_SCSI, err_InvalidSCSICmd);
+            break;
+
+        case SS_INVALID_HA:
+            retcode = MakeEC(err_SCSI, err_InvalidAdapter);
+            break;
+
+        case SS_NO_DEVICE:
+            retcode = MakeEC(err_SCSI, err_NOTARGET);
+            break;
+
+        case SS_INVALID_SRB:
+            retcode = MakeEC(err_SCSI, err_InvalidCMD);
+            break;
+
+        case SS_FAILED_INIT:
+            retcode = MakeEC(err_SCSI, err_FailedInit);
+            break;
+
+        case SS_ASPI_IS_BUSY:
+            retcode = MakeEC(err_SCSI, err_ASPIIsBusy);
+            break;
+
+        case SS_BUFFER_TO_BIG:
+            retcode = MakeEC(err_SCSI, err_BufferToBig);
+            break;
+
+        default:
+            retcode = MakeEC(err_SCSI, err_UNKNOWNERR);
+            break;
+    }
+
+    return(retcode);
+}
+
+
+
+/*************************************************************
+ //     TestUnitReady -
+ //
+ //          Sends the SCSI TEST UNIT READY command to the CartDev
+ //      
+ //
+ //     ENTRY      stat = HSI_TestUnitReady()
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            uses the ASPI interface routines.
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  05 Apr Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Modified for the Win'95 Port. Data structures are new...
+*/
+
+EC
+HSI_TestUnitReady(BYTE lun)
+{
+    EC            retcode;
+
+    HANDLE  ASPICompletionEvent;
+    DWORD   ASPIEventStatus;
+
+
+    retcode = err_NOERROR;
+
+    // Creat an event, no security attributes, manual reset, unsignaled, unnamed
+
+    if((ASPICompletionEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
+        // Unable to create the completion event.
+        if(HSIDebug != 0) {
+            MessageBox( HSI_hwnd,
+                        "HSI Library -- HSI_TestUnitReady()",
+                        "Unable to create completion event.",
+                        MB_ICONSTOP
+                       );
+
+        }
+
+        return(MakeEC(err_LIB, err_CreateEvent));
+    }
+
+    memset(&ExecSRB, 0, sizeof(ExecSRB));
+
+    ExecSRB.SRB_Cmd             = SC_EXEC_SCSI_CMD;
+    ExecSRB.SRB_HaId            = HSI_QHost;
+    ExecSRB.SRB_Flags           = SRB_DIR_IN | SRB_EVENT_NOTIFY;
+    ExecSRB.SRB_Target          = HSI_QID;
+    ExecSRB.SRB_Lun             = lun;
+    ExecSRB.SRB_SenseLen        = SENSE_LEN;
+    ExecSRB.SRB_PostProc        = ASPICompletionEvent;
+
+    ExecSRB.SRB_CDBLen          = 6;
+
+    ExecSRB.CDBByte[0]          = SCSI_TST_U_RDY;
+    ExecSRB.CDBByte[1]          = lun << 5;
+    ExecSRB.CDBByte[2]          = 0;
+    ExecSRB.CDBByte[3]          = 0;
+    ExecSRB.CDBByte[4]          = 0;
+    ExecSRB.CDBByte[5]          = 0;
+
+    LastSRB        = (void *)&ExecSRB;
+    LastSenseP     = &ExecSRB.SenseArea[0];
+                                             
+    ASPIStatus = SendASPI32Command((LPSRB) &ExecSRB);
+
+
+    if(ExecSRB.SRB_Status == SS_PENDING)
+        ASPIEventStatus = WaitForSingleObject(ASPICompletionEvent, HSI_TimeOut);
+
+
+    switch(ASPIEventStatus) {
+        case    WAIT_OBJECT_0:
+            ResetEvent(ASPICompletionEvent);
+            break;
+
+        case    WAIT_ABANDONED:
+            ResetEvent(ASPICompletionEvent);
+            CloseHandle(ASPICompletionEvent);
+            return(MakeEC(err_LIB, err_ThreadTerminated));
+            break;
+
+        case    WAIT_TIMEOUT:
+            ResetEvent(ASPICompletionEvent);
+            CloseHandle(ASPICompletionEvent);
+            return(MakeEC(err_SCSI, err_TimeOut));
+            break;
+
+        default:
+            return(MakeEC(err_SCSI, err_UNKNOWNERR));
+    }
+
+    retcode = InterpretASPIStatus(ExecSRB.SRB_Status, lun);
+
+    HSI_LastError = retcode;
+
+    CloseHandle(ASPICompletionEvent);
+
+    return(retcode);
+}
+
+
+
+
+/*************************************************************
+ //     RequestSense -
+ //
+ //          Sends the SCSI REQUST SENSE command to the CartDev
+ //      
+ //
+ //     ENTRY      stat = HSI_RequestSense()
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            uses the ASPI interface routines.
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC xx Jan 94      Initial Implementation
+ //            GBC 12 May 94      Note that the SensePtr MUST be in the lower MEG!!!!!
+ //            GBC  11 Aug 95     Modified for the Win'95 Port. Data structures are new...
+*/
+
+EC
+HSI_RequestSense(BYTE lun, BYTE *SensePtr)
+{
+    EC            retcode;
+
+    HANDLE  ASPICompletionEvent;
+    DWORD   ASPIEventStatus;
+
+
+    retcode = err_NOERROR;
+
+
+    // Creat an event, no security attributes, manual reset, unsignaled, unnamed
+
+    if((ASPICompletionEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
+        // Unable to create the completion event.
+        if(HSIDebug != 0) {
+            MessageBox( HSI_hwnd,
+                        "HSI Library -- HSI_RequestSense()",
+                        "Unable to create completion event.",
+                        MB_ICONSTOP
+                       );
+
+        }
+
+        return(MakeEC(err_LIB, err_CreateEvent));
+    }
+
+    memset(&ExecSRB, 0, sizeof(ExecSRB));
+
+    ExecSRB.SRB_Cmd             = SC_EXEC_SCSI_CMD;
+    ExecSRB.SRB_HaId            = HSI_QHost;
+    ExecSRB.SRB_Flags           = SRB_DIR_IN | SRB_EVENT_NOTIFY;
+    ExecSRB.SRB_Target          = HSI_QID;
+    ExecSRB.SRB_Lun             = lun;
+    ExecSRB.SRB_SenseLen        = SENSE_LEN;
+    ExecSRB.SRB_BufLen          = sizeof(ReqSenseT);
+    ExecSRB.SRB_BufPointer      = SensePtr;
+    ExecSRB.SRB_PostProc        = ASPICompletionEvent;
+
+    ExecSRB.SRB_CDBLen          = 6;
+
+    ExecSRB.CDBByte[0]          = SCSI_TST_U_RDY;
+    ExecSRB.CDBByte[1]          = lun << 5;
+    ExecSRB.CDBByte[2]          = 0;
+    ExecSRB.CDBByte[3]          = 0;
+    ExecSRB.CDBByte[4]          = SENSE_LEN;
+    ExecSRB.CDBByte[5]          = 0;
+
+    LastSRB        = (void *)&ExecSRB;
+    LastSenseP     = &ExecSRB.SenseArea[0];
+                                             
+    ASPIStatus = SendASPI32Command((LPSRB) &ExecSRB);
+
+
+
+    if(ExecSRB.SRB_Status == SS_PENDING)
+        ASPIEventStatus = WaitForSingleObject(ASPICompletionEvent, HSI_TimeOut);
+
+
+    switch(ASPIEventStatus) {
+        case    WAIT_OBJECT_0:
+            ResetEvent(ASPICompletionEvent);
+            break;
+
+        case    WAIT_ABANDONED:
+            ResetEvent(ASPICompletionEvent);
+            CloseHandle(ASPICompletionEvent);
+            return(MakeEC(err_LIB, err_ThreadTerminated));
+            break;
+
+        case    WAIT_TIMEOUT:
+            ResetEvent(ASPICompletionEvent);
+            CloseHandle(ASPICompletionEvent);
+            return(MakeEC(err_SCSI, err_TimeOut));
+            break;
+
+        default:
+            return(MakeEC(err_SCSI, err_UNKNOWNERR));
+    }
+
+    retcode = InterpretASPIStatus(ExecSRB.SRB_Status, lun);
+
+    HSI_LastError = retcode;
+
+    CloseHandle(ASPICompletionEvent);
+
+    return(retcode);
+}
+
+
+
+
+
+
+
+/*************************************************************
+ //     ProcessCheckCondition -
+ //
+ //     Sends the SCSI REQUST SENSE command to the CartDev, and interprets
+ //     the results.
+ //      
+ //
+ //     ENTRY      stat = HSI_ProcessCheckCondition()
+ //
+ //     EXIT
+ //            returns an EC - error code.
+ //
+ //     ERRORS
+ //            tbd
+ //            
+ //     MEMORY
+ //            -none-
+ //            
+ //     ROUTINES
+ //            uses the ASPI interface routines.
+ //            
+ //     NOTES
+ //          Written by the Igneous Group under agreement with
+ //          Sega Of America, Inc.
+ //            
+ //     MODS
+ //            GBC  07 Jan 94     Initial Implementation
+ //            GBC  11 Aug 95     Modified for the Win'95 Port. Minor revamping...
+*/
+
+
+EC
+HSI_ProcessCheckCondition(ChannelID cid)
+{
+    EC          retval;
+
+    WORD        scq;             // sense code & qualifiers...
+
+    ReqSenseT   rq,
+               *rqP;
+
+
+    retval = MakeEC(err_SCSI, err_UNKNOWNERR);
+
+    rqP = &rq;
+
+    if(LastSenseP != NULL)  {
+    
+        rqP = (ReqSenseT *)LastSenseP;        
+        
+        if(rqP->ErrorCode == 0)  {
+        
+            // An automatic request sense was NOT generated...get the sense data
+            HSI_RequestSense(cid, (BYTE *)&rq);
+            rqP = &rq;
+        }
+    } else {
+        
+        HSI_RequestSense(cid, (BYTE *)&rq);
+    }
+
+
+    if((rqP->SenseKey == NoSense) || (rqP->SenseKey == UnitAttention)) {
+
+        retval = err_NOERROR;
+
+    } else if(rqP->SenseKey == HardwareError) {
+
+        retval = MakeEC(err_CARTDEV, err_DIAGFAIL);
+
+    } else if(rqP->SenseKey == eGame) {
+
+        // In this case look at the additional sense key data to find out
+        // what the specific failure is.
+        scq = (rqP->AddSenseCode << 8) | (rqP->AddSenseQual);
+
+        switch(scq) {
+
+            case  eGameAddress:
+                retval = MakeEC(err_CARTDEV, err_GameAddress);
+                break;
+
+            case  eAddrTransferCount:
+                retval = MakeEC(err_CARTDEV, err_AddrTransferCount);
+                break;
+
+            case  eAddrDirection:
+                retval = MakeEC(err_CARTDEV, err_AddrDirection);
+                break;
+
+            case  eDPRTransferCount:
+                retval = MakeEC(err_CARTDEV, err_DPRTransferCount);
+                break;
+
+            case  eBufferNumber:
+                retval = MakeEC(err_CARTDEV, err_BufferNumber);
+                break;
+
+            case  eBufferDirection:
+                retval = MakeEC(err_CARTDEV, err_BufferDirection);
+                break;
+
+            case  eBufferAddress:
+                retval = MakeEC(err_CARTDEV, err_BufferAddress);
+                break;
+
+            case eBufferTransferCount:
+                retval = MakeEC(err_CARTDEV, err_BufferTransferCount);
+                break;
+
+            case eBufferReady:
+                retval = MakeEC(err_CARTDEV, err_BufferReady);
+                break;
+
+            case  eInterruptDisabled:
+                retval = MakeEC(err_CARTDEV, err_INTDisabled);
+                break;
+
+            case  eControlGame:
+                retval = MakeEC(err_GAME, err_ControlGame);
+                break;
+                
+            case eSoundBoard:
+                retval = MakeEC(err_CARTDEV, err_SoundBoard);
+                break;
+                
+            case eCheckSumROM:
+                retval = MakeEC(err_CARTDEV, err_CheckSumROM);
+                break;
+
+            case ePageChecksum:
+                retval = MakeEC(err_CARTDEV, err_PageChecksum);
+                break;
+
+            case eProgram:
+                retval = MakeEC(err_CARTDEV, err_Program);
+                break;
+
+            default:
+                retval = MakeEC(err_CARTDEV, err_CARTDEVERR);
+                break;
+        }
+
+    }
+
+    return(retval);
+}
